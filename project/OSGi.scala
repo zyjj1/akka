@@ -4,7 +4,6 @@
 
 package akka
 
-import com.typesafe.sbt.osgi.OsgiKeys
 import com.typesafe.sbt.osgi.SbtOsgi._
 import com.typesafe.sbt.osgi.SbtOsgi.autoImport._
 import sbt._
@@ -28,7 +27,7 @@ object OSGi {
   )
 
   val actor = osgiSettings ++ Seq(
-    OsgiKeys.exportPackage := Seq("akka*"),
+    OsgiKeys.exportPackage := Seq("akka*", "META-INF.versions.9.akka*"), // TODO: Refine this as it errors
     OsgiKeys.privatePackage := Seq("akka.osgi.impl"),
     //akka-actor packages are not imported, as contained in the CP
     OsgiKeys.importPackage := (osgiOptionalImports map optionalResolution) ++ Seq("!sun.misc", scalaJava8CompatImport(), scalaVersion(scalaImport).value, configImport(), "*"),

@@ -7,6 +7,7 @@ package akka.persistence.journal.leveldb
 import akka.persistence.journal.JournalSpec
 import akka.persistence.{ PersistenceSpec, PluginCleanup }
 
+/* FIXME #23907
 class LeveldbJournalJavaSpec extends JournalSpec(
   config = PersistenceSpec.config(
     "leveldb",
@@ -16,3 +17,4 @@ class LeveldbJournalJavaSpec extends JournalSpec(
 
   override def supportsRejectingNonSerializableObjects = true
 }
+*/

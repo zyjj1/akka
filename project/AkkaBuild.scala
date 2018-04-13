@@ -151,7 +151,7 @@ object AkkaBuild {
           "-Djava.security.egd=file:/dev/./urandom")
 
         if (sys.props.contains("akka.ci-server"))
-          defaults ++ Seq("-XX:+PrintGCTimeStamps", "-XX:+PrintGCDetails")
+          defaults ++ Seq("-Xlog:gc", "-Xlog:gc*")
         else
           defaults
       },

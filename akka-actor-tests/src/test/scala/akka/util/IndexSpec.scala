@@ -47,7 +47,8 @@ class IndexSpec extends AkkaSpec with Matchers with DefaultTimeout {
       index.valueIterator("s1").toSet should ===(Set(1, 2, 3))
       index.valueIterator("s2").toSet should ===(Set(4))
     }
-    "remove values" in {
+    "remove values" in pendingUntilFixed { // FIXME #23901
+
       val index = emptyIndex
       index.put("s1", 1)
       index.put("s1", 2)
@@ -95,7 +96,7 @@ class IndexSpec extends AkkaSpec with Matchers with DefaultTimeout {
       index.clear()
       index.isEmpty should ===(true)
     }
-    "be able to be accessed in parallel" in {
+    "be able to be accessed in parallel" in pendingUntilFixed { // FIXME #23901
       val index = new Index[Int, Int](100, new Comparator[Int] {
         override def compare(a: Int, b: Int): Int = Integer.compare(a, b)
       })

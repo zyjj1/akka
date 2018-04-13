@@ -82,7 +82,6 @@ lazy val agent = akkaModule("akka-agent")
 lazy val akkaScalaNightly = akkaModule("akka-scala-nightly")
   // remove dependencies that we have to build ourselves (Scala STM)
   .aggregate(aggregatedProjects diff List[ProjectReference](agent, docs): _*)
-  .disablePlugins(MimaPlugin)
   .disablePlugins(ValidatePullRequest, MimaPlugin, CopyrightHeaderInPr)
 
 lazy val benchJmh = akkaModule("akka-bench-jmh")
@@ -104,6 +103,9 @@ lazy val camel = akkaModule("akka-camel")
   .settings(Dependencies.camel)
   .settings(AutomaticModuleName.settings("akka.camel"))
   .settings(OSGi.camel)
+  .settings(
+    javaOptions in Test ++= Seq("--add-modules", "java.xml.bind"),
+  )
 
 lazy val cluster = akkaModule("akka-cluster")
   .dependsOn(remote, remoteTests % "test->test" , testkit % "test->test")
@@ -232,7 +234,8 @@ lazy val docs = akkaModule("akka-docs")
     ),
     paradoxGroups := Map("Language" -> Seq("Scala", "Java")),
     resolvers += Resolver.jcenterRepo,
-    deployRsyncArtifact := List((paradox in Compile).value -> s"www/docs/akka/${version.value}")
+    deployRsyncArtifact := List((paradox in Compile).value -> s"www/docs/akka/${version.value}"),
+    javaOptions in Test ++= Seq("--add-modules", "java.xml.bind"),
   )
   .enablePlugins(AkkaParadoxPlugin, DeployRsync, NoPublish, ParadoxBrowse, ScaladocNoVerificationOfDiagrams)
   .settings(ParadoxSupport.paradoxWithCustomDirectives)
