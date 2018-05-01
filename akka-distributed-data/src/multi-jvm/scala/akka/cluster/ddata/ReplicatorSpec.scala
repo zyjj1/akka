@@ -34,7 +34,7 @@ class ReplicatorSpecMultiJvmNode1 extends ReplicatorSpec
 class ReplicatorSpecMultiJvmNode2 extends ReplicatorSpec
 class ReplicatorSpecMultiJvmNode3 extends ReplicatorSpec
 
-class ReplicatorSpec extends MultiNodeSpec(ReplicatorSpec) with STMultiNodeSpec with ImplicitSender {
+abstract class ReplicatorSpec extends MultiNodeSpec(ReplicatorSpec) with STMultiNodeSpec with ImplicitSender {
   import ReplicatorSpec._
   import Replicator._
 

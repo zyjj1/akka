@@ -72,6 +72,10 @@ abstract class MultiDcSplitBrainSpec
   var splits = 0
   var unsplits = 0
 
+  def otherDc(): String = {
+    if (cluster.selfDataCenter == "dc1") "dc2" else "dc1"
+  }
+
   def splitDataCenters(doNotVerify: Set[RoleName]): Unit = {
     splits += 1
     val memberNodes = (dc1 ++ dc2).filterNot(doNotVerify)
@@ -93,15 +97,8 @@ abstract class MultiDcSplitBrainSpec
     runOn(memberNodes: _*) {
       probe.expectMsgType[UnreachableDataCenter](15.seconds)
       cluster.unsubscribe(probe.ref)
-      runOn(dc1: _*) {
-        awaitAssert {
-          cluster.state.unreachableDataCenters should ===(Set("dc2"))
-        }
-      }
-      runOn(dc2: _*) {
-        awaitAssert {
-          cluster.state.unreachableDataCenters should ===(Set("dc1"))
-        }
+      awaitAssert {
+        cluster.state.unreachableDataCenters should ===(Set(otherDc()))
       }
       cluster.state.unreachable should ===(Set.empty)
     }
@@ -114,7 +111,7 @@ abstract class MultiDcSplitBrainSpec
     val probe = TestProbe()
     runOn(memberNodes: _*) {
       cluster.subscribe(probe.ref, classOf[ReachableDataCenter])
-      probe.expectMsgType[CurrentClusterState]
+      probe.expectMsgType[CurrentClusterState].unreachableDataCenters shouldEqual (Set(otherDc()))
     }
     enterBarrier(s"unsplit-$unsplits")
 

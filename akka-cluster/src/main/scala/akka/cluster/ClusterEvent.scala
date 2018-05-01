@@ -422,10 +422,14 @@ object ClusterEvent {
     else {
       val otherDcs = (oldState.latestGossip.allDataCenters union newState.latestGossip.allDataCenters) - newState.selfDc
 
-      val oldUnreachableDcs = otherDcs.filterNot(isReachable(oldState, Set()))
-      val currentUnreachableDcs = otherDcs.filterNot(isReachable(newState, Set()))
+      val oldUnreachableDcs: Set[DataCenter] = otherDcs.filterNot(isReachable(oldState, Set()))
+      val currentUnreachableDcs: Set[DataCenter] = otherDcs.filterNot(isReachable(newState, Set()))
 
-      (oldUnreachableDcs diff currentUnreachableDcs).map(ReachableDataCenter)(collection.breakOut)
+      val reachable = (oldUnreachableDcs diff currentUnreachableDcs).map(ReachableDataCenter)(collection.breakOut)
+
+      println(s"${reachable}. OldUnreachable: [${oldUnreachableDcs}] CurrentUnreachable: [${currentUnreachableDcs}] oldState: [$oldState] newState [$newState]")
+
+      reachable
     }
   }
 
