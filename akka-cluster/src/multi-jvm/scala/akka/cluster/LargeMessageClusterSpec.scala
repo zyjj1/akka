@@ -30,6 +30,7 @@ object LargeMessageClusterMultiJvmSpec extends MultiNodeConfig {
   commonConfig(ConfigFactory.parseString(
     s"""
     akka {
+      loglevel = DEBUG
       cluster.debug.verbose-heartbeat-logging = on
       loggers = ["akka.testkit.TestEventListener"]
 
