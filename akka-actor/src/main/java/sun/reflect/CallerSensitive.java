@@ -23,10 +23,10 @@
  * questions.
  */
 
-package sun.reflect;
+/*package sun.reflect;
 
 import java.lang.annotation.*;
-import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.ElementType.*;*/
 
 /**
  * A method annotated @CallerSensitive is sensitive to its calling class,
@@ -35,7 +35,8 @@ import static java.lang.annotation.ElementType.*;
  *
  * @author John R. Rose
  */
-@Retention(RetentionPolicy.RUNTIME)
+/*@Retention(RetentionPolicy.RUNTIME)
 @Target({METHOD})
 public @interface CallerSensitive {
 }
+*/

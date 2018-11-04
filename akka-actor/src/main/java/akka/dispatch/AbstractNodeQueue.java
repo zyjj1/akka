@@ -5,7 +5,10 @@
 package akka.dispatch;
 
 import akka.util.Unsafe;
+import akka.util.Atomic;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -45,7 +48,7 @@ public abstract class AbstractNodeQueue<T> extends AtomicReference<AbstractNodeQ
      */
     @SuppressWarnings("unchecked")
     protected final Node<T> peekNode() {
-        final Node<T> tail = ((Node<T>)Unsafe.instance.getObjectVolatile(this, tailOffset));
+        final Node<T> tail = (Node<T>)tailRef.get(this);
         Node<T> next = tail.next();
         if (next == null && get() != tail) {
             // if tail != head this is not going to change until producer makes progress
@@ -101,7 +104,7 @@ public abstract class AbstractNodeQueue<T> extends AtomicReference<AbstractNodeQ
      * @return true if queue was empty at some point in the past
      */
     public final boolean isEmpty() {
-        return Unsafe.instance.getObjectVolatile(this, tailOffset) == get();
+        return tailRef.get(this) == get();
     }
 
     /**
@@ -117,7 +120,7 @@ public abstract class AbstractNodeQueue<T> extends AtomicReference<AbstractNodeQ
     public final int count() {
         int count = 0;
         final Node<T> head = get();
-        for(Node<T> n = ((Node<T>) Unsafe.instance.getObjectVolatile(this, tailOffset)).next();
+        for(Node<T> n = ((Node<T>)tailRef.get(this)).next();
             n != null && count < Integer.MAX_VALUE; 
             n = n.next()) {
           ++count;
@@ -153,39 +156,33 @@ public abstract class AbstractNodeQueue<T> extends AtomicReference<AbstractNodeQ
      */
     @SuppressWarnings("unchecked")
     public final Node<T> pollNode() {
-      final Node<T> tail = (Node<T>) Unsafe.instance.getObjectVolatile(this, tailOffset);
+      final Node<T> tail = (Node<T>)tailRef.get(this);
       Node<T> next = tail.next();
       if (next == null && get() != tail) {
           // if tail != head this is not going to change until producer makes progress
           // we can avoid reading the head and just spin on next until it shows up
-          do {
-              next = tail.next();
-          } while (next == null);
+          while ((next = tail.next()) == null)
+            Atomic.onSpinWait();
       }
       if (next == null) return null;
       else {
         tail.value = next.value;
         next.value = null;
-        Unsafe.instance.putOrderedObject(this, tailOffset, next);
+        tailRef.setOrdered(this, next);
         tail.setNext(null);
         return tail;
       }
     }
 
-    private final static long tailOffset;
-
-    static {
-        try {
-          tailOffset = Unsafe.instance.objectFieldOffset(AbstractNodeQueue.class.getDeclaredField("_tailDoNotCallMeDirectly"));
-        } catch(Throwable t){
-            throw new ExceptionInInitializerError(t);
-        }
-    }
+    private final static Atomic.Reference<AbstractNodeQueue, Node> tailRef = 
+      Atomic.<AbstractNodeQueue, Node>Reference(MethodHandles.lookup(), AbstractNodeQueue.class, "_tailDoNotCallMeDirectly", Node.class);
 
     public static class Node<T> {
         public T value;
         @SuppressWarnings("unused")
         private volatile Node<T> _nextDoNotCallMeDirectly;
+
+        private final static Atomic.Reference<Node, Node> nextRef = Atomic.<Node, Node>Reference(MethodHandles.lookup(), Node.class, "_nextDoNotCallMeDirectly", Node.class);
 
         public Node() {
             this(null);
@@ -197,21 +194,13 @@ public abstract class AbstractNodeQueue<T> extends AtomicReference<AbstractNodeQ
 
         @SuppressWarnings("unchecked")
         public final Node<T> next() {
-            return (Node<T>)Unsafe.instance.getObjectVolatile(this, nextOffset);
+            return (Node<T>)nextRef.get(this);
         }
 
         protected final void setNext(final Node<T> newNext) {
-          Unsafe.instance.putOrderedObject(this, nextOffset, newNext);
-        }
-        
-        private final static long nextOffset;
-        
-        static {
-            try {
-                nextOffset = Unsafe.instance.objectFieldOffset(Node.class.getDeclaredField("_nextDoNotCallMeDirectly"));
-            } catch(Throwable t){
-                throw new ExceptionInInitializerError(t);
-            } 
+          nextRef.setOrdered(this, newNext);
         }
     } 
 }
+
+
