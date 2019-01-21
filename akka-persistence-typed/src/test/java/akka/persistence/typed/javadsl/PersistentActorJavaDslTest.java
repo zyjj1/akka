@@ -559,4 +559,66 @@ public class PersistentActorJavaDslTest extends JUnitSuite {
   }
   // event-wrapper
 
+  class SequenceNumberBehavior extends EventSourcedBehavior<String, String, String> {
+    private final ActorRef<String> probe;
+    private final ActorContext<String> context;
+
+    public SequenceNumberBehavior(
+        PersistenceId persistenceId, ActorRef<String> probe, ActorContext<String> context) {
+      super(persistenceId);
+      this.probe = probe;
+      this.context = context;
+    }
+
+    @Override
+    public String emptyState() {
+      return "";
+    }
+
+    @Override
+    public CommandHandler<String, String, String> commandHandler() {
+      return newCommandHandlerBuilder()
+          .forAnyState()
+          .matchAny(
+              (state, cmd) -> {
+                probe.tell(lastSequenceNumber(context) + " onCommand");
+                return Effect()
+                    .persist(cmd)
+                    .thenRun((newState) -> probe.tell(lastSequenceNumber(context) + " thenRun"));
+              });
+    }
+
+    @Override
+    public EventHandler<String, String> eventHandler() {
+      return newEventHandlerBuilder()
+          .forAnyState()
+          .matchAny(
+              (state, event) -> {
+                probe.tell(lastSequenceNumber(context) + " applyEvent");
+                return state + event;
+              });
+    }
+
+    @Override
+    public void onRecoveryCompleted(String s) {
+      probe.tell(lastSequenceNumber(context) + " onRecoveryCompleted");
+    }
+  }
+
+  @Test
+  public void accessLastSequenceNumber() {
+    TestProbe<String> probe = testKit.createTestProbe(String.class);
+    ActorRef<String> ref =
+        testKit.spawn(
+            Behaviors.<String>setup(
+                context ->
+                    new SequenceNumberBehavior(
+                        new PersistenceId("seqnr1"), probe.getRef(), context)));
+
+    probe.expectMessage("0 onRecoveryCompleted");
+    ref.tell("cmd");
+    probe.expectMessage("0 onCommand");
+    probe.expectMessage("0 applyEvent");
+    probe.expectMessage("1 thenRun");
+  }
 }

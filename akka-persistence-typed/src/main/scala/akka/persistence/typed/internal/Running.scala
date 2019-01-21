@@ -98,7 +98,6 @@ private[akka] object Running {
       case _                                ⇒ Behaviors.unhandled
     }
 
-
     override def onSignal: PartialFunction[Signal, Behavior[InternalProtocol]] = {
       case PoisonPill ⇒
         if (isInternalStashEmpty && !isUnstashAllInProgress) Behaviors.stopped
