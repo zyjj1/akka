@@ -579,7 +579,7 @@ public class PersistentActorJavaDslTest extends JUnitSuite {
     public CommandHandler<String, String, String> commandHandler() {
       return newCommandHandlerBuilder()
           .forAnyState()
-          .matchAny(
+          .onAnyCommand(
               (state, cmd) -> {
                 probe.tell(lastSequenceNumber(context) + " onCommand");
                 return Effect()
@@ -592,7 +592,7 @@ public class PersistentActorJavaDslTest extends JUnitSuite {
     public EventHandler<String, String> eventHandler() {
       return newEventHandlerBuilder()
           .forAnyState()
-          .matchAny(
+          .onAnyEvent(
               (state, event) -> {
                 probe.tell(lastSequenceNumber(context) + " applyEvent");
                 return state + event;
