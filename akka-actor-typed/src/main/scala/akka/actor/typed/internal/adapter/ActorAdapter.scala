@@ -109,6 +109,18 @@ import akka.util.OptionVal
     }
   }
 
+  def updateNextBehaviorAfterUnstash(b: Behavior[T], msg: T): Unit = {
+    if (Behavior.isUnhandled(b)) unhandled(msg)
+    else {
+      // StoppedBehavior and FailedBehavior
+      if (Behavior.isAlive(b)) {
+        behavior = Behavior.canonicalize(b, behavior, ctx)
+      } else {
+        throw new IllegalStateException(s"Unexpected stopped/failed behavior: $b")
+      }
+    }
+  }
+
   private def adaptAndHandle(msg: Any): Unit = {
     @tailrec def handle(adapters: List[(Class[_], Any ⇒ T)]): Unit = {
       adapters match {

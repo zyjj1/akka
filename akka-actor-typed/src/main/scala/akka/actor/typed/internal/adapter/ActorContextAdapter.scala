@@ -23,6 +23,9 @@ import scala.concurrent.duration._
 
   private[akka] def currentBehavior: Behavior[T] = adapter.currentBehavior
 
+  private[akka] def updateNextBehaviorAfterUnstash(b: Behavior[T], msg: T): Unit =
+    adapter.updateNextBehaviorAfterUnstash(b, msg)
+
   // lazily initialized
   private var actorLogger: OptionVal[Logger] = OptionVal.None
 

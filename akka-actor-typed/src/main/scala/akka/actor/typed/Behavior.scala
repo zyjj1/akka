@@ -6,10 +6,11 @@ package akka.actor.typed
 
 import akka.actor.InvalidMessageException
 import akka.actor.typed.internal.BehaviorImpl
-
 import scala.annotation.tailrec
+
 import akka.actor.typed.internal.BehaviorImpl.OrElseBehavior
 import akka.actor.typed.internal.WrappingBehavior
+import akka.actor.typed.internal.adapter.ActorContextAdapter
 import akka.util.{ LineNumbers, OptionVal }
 import akka.annotation.{ ApiMayChange, DoNotInherit, InternalApi }
 import akka.actor.typed.scaladsl.{ ActorContext ⇒ SAC }
@@ -431,15 +432,25 @@ object Behavior {
    * The returned [[Behavior]] from each processed message is used for the next message.
    */
   @InternalApi private[akka] def interpretMessages[T](behavior: Behavior[T], ctx: TypedActorContext[T], messages: Iterator[T]): Behavior[T] = {
+
+    val actorContextAdapter = ctx match {
+      case a: ActorContextAdapter[T] ⇒ a
+      // FIXME we would have to find a solution for StubbedActorContext (Behavior TestKit)
+      case c                         ⇒ throw new IllegalStateException(s"Unexpected ActorContext [${c.getClass.getName}]")
+    }
+
     @tailrec def interpretOne(b: Behavior[T]): Behavior[T] = {
       val b2 = Behavior.start(b, ctx)
       if (!Behavior.isAlive(b2) || !messages.hasNext) b2
       else {
-        val nextB = messages.next() match {
+        val next = messages.next()
+        val nextB = next match {
           case sig: Signal ⇒ Behavior.interpretSignal(b2, ctx, sig)
           case msg         ⇒ Behavior.interpretMessage(b2, ctx, msg)
         }
-        interpretOne(Behavior.canonicalize(nextB, b, ctx)) // recursive
+
+        actorContextAdapter.updateNextBehaviorAfterUnstash(nextB, next)
+        interpretOne(actorContextAdapter.currentBehavior) // recursive
       }
     }
 

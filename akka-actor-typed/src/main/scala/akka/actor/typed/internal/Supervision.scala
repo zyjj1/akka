@@ -18,6 +18,7 @@ import akka.actor.typed.BehaviorInterceptor.PreStartTarget
 import akka.actor.typed.BehaviorInterceptor.ReceiveTarget
 import akka.actor.typed.BehaviorInterceptor.SignalTarget
 import akka.actor.typed.SupervisorStrategy._
+import akka.actor.typed.internal.adapter.ActorContextAdapter
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.StashBuffer
 import akka.annotation.InternalApi
@@ -326,9 +327,15 @@ private class RestartSupervisor[O, T, Thr <: Throwable: ClassTag](initial: Behav
           stashBuffer.unstashAll(ctx.asScala.asInstanceOf[scaladsl.ActorContext[Any]], newBehavior.unsafeCast)
       }
       nextBehavior.narrow
-    } catch handleException(ctx, signalRestart = () ⇒ ())
-    // FIXME signal Restart is not done if unstashAll throws, unstash of each message may return a new behavior and
-    //      it's the failing one that should receive the signal
+    } catch handleException(ctx, signalRestart = () ⇒ {
+      val actorContextAdapter = ctx match {
+        case a: ActorContextAdapter[O] ⇒ a
+        case c                         ⇒ throw new IllegalStateException(s"Unexpected ActorContext [${c.getClass.getName}]")
+      }
+      // unstash of each message may return a new behavior and it's the failing one that should receive the signal
+      Behavior.interpretSignal(actorContextAdapter.currentBehavior, ctx, PreRestart)
+      ()
+    })
   }
 
   private def stopChildren(ctx: TypedActorContext[_], children: Set[ActorRef[Nothing]]): Unit = {
