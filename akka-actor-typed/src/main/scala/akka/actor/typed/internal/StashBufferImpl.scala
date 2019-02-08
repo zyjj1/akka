@@ -111,3 +111,4 @@ import akka.util.ConstantFun
     s"StashBuffer($size/$capacity)"
 }
 
+final case class UnstashException[T](cause: Throwable, behavior: Behavior[T]) extends RuntimeException

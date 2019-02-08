@@ -146,16 +146,21 @@ import akka.util.OptionVal
       recordChildFailure(cause)
       untyped.SupervisorStrategy.Stop
     case ex ⇒
-      recordChildFailure(ex)
-      val logMessage = ex match {
+      val unwrapped = ex match {
+        case UnstashException(e, _) ⇒ e
+        case _                      ⇒ ex
+      }
+      recordChildFailure(unwrapped)
+      val logMessage = unwrapped match {
         case e: ActorInitializationException if e.getCause ne null ⇒ e.getCause match {
           case ex: InvocationTargetException if ex.getCause ne null ⇒ ex.getCause.getMessage
+          case UnstashException(e2, _) ⇒ e2.getMessage
           case ex ⇒ ex.getMessage
         }
         case e ⇒ e.getMessage
       }
       // log at Error as that is what the supervision strategy would have done.
-      log.error(ex, logMessage)
+      log.error(unwrapped, logMessage)
       untyped.SupervisorStrategy.Stop
   }
 

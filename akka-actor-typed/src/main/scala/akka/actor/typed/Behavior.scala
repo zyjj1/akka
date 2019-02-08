@@ -6,9 +6,11 @@ package akka.actor.typed
 
 import akka.actor.InvalidMessageException
 import akka.actor.typed.internal.BehaviorImpl
-
 import scala.annotation.tailrec
+import scala.util.control.NonFatal
+
 import akka.actor.typed.internal.BehaviorImpl.OrElseBehavior
+import akka.actor.typed.internal.UnstashException
 import akka.actor.typed.internal.WrappingBehavior
 import akka.util.{ LineNumbers, OptionVal }
 import akka.annotation.{ ApiMayChange, DoNotInherit, InternalApi }
@@ -435,10 +437,15 @@ object Behavior {
       val b2 = Behavior.start(b, ctx)
       if (!Behavior.isAlive(b2) || !messages.hasNext) b2
       else {
-        val nextB = messages.next() match {
-          case sig: Signal ⇒ Behavior.interpretSignal(b2, ctx, sig)
-          case msg         ⇒ Behavior.interpretMessage(b2, ctx, msg)
+        val nextB = try {
+          messages.next() match {
+            case sig: Signal ⇒ Behavior.interpretSignal(b2, ctx, sig)
+            case msg         ⇒ Behavior.interpretMessage(b2, ctx, msg)
+          }
+        } catch {
+          case NonFatal(e) ⇒ throw UnstashException(e, b2)
         }
+
         interpretOne(Behavior.canonicalize(nextB, b, ctx)) // recursive
       }
     }
