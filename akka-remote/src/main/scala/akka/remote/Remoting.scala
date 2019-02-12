@@ -8,7 +8,7 @@ import akka.Done
 import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.event.{ Logging, LoggingAdapter }
-import akka.pattern.{ gracefulStop, pipe, ask }
+import akka.pattern.{ ask, gracefulStop, pipe }
 import akka.remote.EndpointManager._
 import akka.remote.Remoting.TransportSupervisor
 import akka.remote.transport.Transport.{ ActorAssociationEventListener, AssociationEventListener, InboundAssociation }
@@ -16,18 +16,23 @@ import akka.remote.transport._
 import com.typesafe.config.Config
 import java.net.URLEncoder
 import java.util.concurrent.TimeoutException
-import scala.collection.immutable.{ Seq, HashMap }
+
+import scala.collection.immutable.{ HashMap, Seq }
 import scala.concurrent.duration._
-import scala.concurrent.{ Promise, Await, Future }
+import scala.concurrent.{ Await, Future, Promise }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
+
 import akka.remote.transport.AkkaPduCodec.Message
 import java.util.concurrent.ConcurrentHashMap
+
 import akka.dispatch.{ RequiresMessageQueue, UnboundedMessageQueueSemantics }
 import akka.util.ByteString.UTF_8
 import akka.util.OptionVal
 import scala.collection.immutable
+
 import akka.actor.ActorInitializationException
+import akka.dispatch.sysmsg.SystemMessage
 import akka.util.ccompat._
 
 /**
@@ -222,8 +227,13 @@ private[remote] class Remoting(_system: ExtendedActorSystem, _provider: RemoteAc
   }
 
   override def send(message: Any, senderOption: OptionVal[ActorRef], recipient: RemoteActorRef): Unit = endpointManager match {
-    case Some(manager) ⇒ manager.tell(Send(message, senderOption, recipient), sender = senderOption getOrElse Actor.noSender)
-    case None          ⇒ throw new RemoteTransportExceptionNoStackTrace("Attempted to send remote message but Remoting is not running.", null)
+    case Some(manager) ⇒
+      message match {
+        case s: SystemMessage ⇒ log.info(s"Case12162: Remoting.send SystemMessage $s")
+        case _                ⇒
+      }
+      manager.tell(Send(message, senderOption, recipient), sender = senderOption getOrElse Actor.noSender)
+    case None ⇒ throw new RemoteTransportExceptionNoStackTrace("Attempted to send remote message but Remoting is not running.", null)
   }
 
   override def managementCommand(cmd: Any): Future[Boolean] = endpointManager match {
@@ -656,7 +666,7 @@ private[remote] class EndpointManager(conf: Config, log: LoggingAdapter) extends
           }
       }
 
-    case s @ Send(_, _, recipientRef, _) ⇒
+    case s @ Send(m, _, recipientRef, _) ⇒
       val recipientAddress = recipientRef.path.address
 
       def createAndRegisterWritingEndpoint(): ActorRef = {
@@ -672,7 +682,18 @@ private[remote] class EndpointManager(conf: Config, log: LoggingAdapter) extends
             writing = true))
       }
 
-      endpoints.writableEndpointWithPolicyFor(recipientAddress) match {
+      val x = endpoints.writableEndpointWithPolicyFor(recipientAddress)
+      m match {
+        case s: SystemMessage ⇒
+          val overdue = x match {
+            case Some(Gated(timeOfRelease)) ⇒ timeOfRelease.isOverdue()
+            case _                          ⇒ false
+          }
+          log.info(s"Case12162: EndpointManager sending SystemMessage $s to $recipientRef, policy $x, gating overdue $overdue")
+        case _ ⇒
+      }
+
+      x match {
         case Some(Pass(endpoint, _)) ⇒
           endpoint ! s
         case Some(Gated(timeOfRelease)) ⇒

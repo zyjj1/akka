@@ -722,11 +722,10 @@ private[akka] class LocalActorRefProvider private[akka] (
       deadLetters
     } else ref.getChild(pathElements.iterator) match {
       case Nobody ⇒
-        if (log.isDebugEnabled)
-          log.debug(
-            "Resolve (deserialization) of path [{}] doesn't match an active actor. " +
-              "It has probably been stopped, using deadLetters.",
-            pathElements.mkString("/"))
+        log.info(
+          "Case12162: Resolve (deserialization) of path [{}] doesn't match an active actor. " +
+            "It has probably been stopped, using EmptyLocalActorRef.",
+          pathElements.mkString("/"))
         new EmptyLocalActorRef(system.provider, ref.path / pathElements, eventStream)
       case x ⇒ x
     }

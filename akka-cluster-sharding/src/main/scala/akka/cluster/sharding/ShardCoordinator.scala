@@ -670,6 +670,7 @@ abstract class ShardCoordinator(typeName: String, settings: ClusterShardingSetti
 
   def receiveTerminated: Receive = {
     case t @ Terminated(ref) ⇒
+      log.info("Case12162: Coordinator [{}] receiveTerminated [{}] [{}]", self, t, state.regions.contains(ref))
       if (state.regions.contains(ref)) {
         if (removalMargin != Duration.Zero && t.addressTerminated && aliveRegions(ref)) {
           context.system.scheduler.scheduleOnce(removalMargin, self, DelayedShardRegionTerminated(ref))
@@ -696,10 +697,13 @@ abstract class ShardCoordinator(typeName: String, settings: ClusterShardingSetti
     state.regions.foreach {
       case (ref, _) ⇒
         val a = ref.path.address
-        if (a.hasLocalScope || nodes(a))
+        if (a.hasLocalScope || nodes(a)) {
+          log.info("Case12162: Coordinator [{}] watching [{}]", self, ref)
           context.watch(ref)
-        else
+        } else {
+          log.info("Case12162: Coordinator [{}] region [{}] not part of cluster", self, ref)
           regionTerminated(ref) // not part of cluster
+        }
     }
     state.regionProxies.foreach { ref ⇒
       val a = ref.path.address
@@ -730,9 +734,9 @@ abstract class ShardCoordinator(typeName: String, settings: ClusterShardingSetti
     }
   }
 
-  def regionTerminated(ref: ActorRef): Unit =
+  def regionTerminated(ref: ActorRef): Unit = {
+    log.info("Case12162: Coordinator [{}] regionTerminated: [{}] [{}]", self, ref, state.regions.contains(ref))
     if (state.regions.contains(ref)) {
-      log.debug("ShardRegion terminated: [{}]", ref)
       regionTerminationInProgress += ref
       state.regions(ref).foreach { s ⇒ self ! GetShardHome(s) }
 
@@ -744,6 +748,7 @@ abstract class ShardCoordinator(typeName: String, settings: ClusterShardingSetti
         allocateShardHomesForRememberEntities()
       }
     }
+  }
 
   def regionProxyTerminated(ref: ActorRef): Unit =
     if (state.regionProxies.contains(ref)) {

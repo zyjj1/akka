@@ -542,6 +542,8 @@ private[akka] class EmptyLocalActorRef(
 
   protected def specialHandle(msg: Any, sender: ActorRef): Boolean = msg match {
     case w: Watch ⇒
+      eventStream.publish(Logging.Info(Logging.simpleName(getClass), getClass, s"Case12162: EmptyLocalActorRef received $w, " +
+        s"sending DeathWatchNotification ${w.watchee == this && w.watcher != this}"))
       if (w.watchee == this && w.watcher != this)
         w.watcher.sendSystemMessage(
           DeathWatchNotification(w.watchee, existenceConfirmed = false, addressTerminated = false))

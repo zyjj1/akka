@@ -46,6 +46,9 @@ private[remote] object AkkaPduCodec {
     def reliableDeliveryEnabled = seqOption.isDefined
 
     override def seq: SeqNo = seqOption.get
+
+    override def toString: String =
+      s"Message($recipient,$recipientAddress,${serializedMessage.getSerializerId},${serializedMessage.getMessageManifest.toStringUtf8},$senderOption,$seqOption)"
   }
 }
 

@@ -97,8 +97,10 @@ private[remote] class DefaultMessageDispatcher(
               ActorSelection.deliverSelection(l, sender, sel)
           case msg: PossiblyHarmful if UntrustedMode ⇒
             log.debug(LogMarker.Security, "operating in UntrustedMode, dropping inbound PossiblyHarmful message of type [{}]", msg.getClass.getName)
-          case msg: SystemMessage ⇒ l.sendSystemMessage(msg)
-          case msg                ⇒ l.!(msg)(sender)
+          case msg: SystemMessage ⇒
+            log.info(s"Case12162: delivering SystemMessage $msg to $l")
+            l.sendSystemMessage(msg)
+          case msg ⇒ l.!(msg)(sender)
         }
 
       case r @ (_: RemoteRef | _: RepointableRef) if !r.isLocal && !UntrustedMode ⇒
@@ -787,6 +789,12 @@ private[remote] class EndpointWriter(
           log.debug("sending message {}", msgLog)
         }
 
+        s.message match {
+          case sysMsg: SystemMessage ⇒
+            log.info(s"Case12162: EndpointWriter.writeSend SystemMessage $sysMsg to ${s.recipient} seqNr ${s.seqOpt} ack $lastAck")
+          case _ ⇒
+        }
+
         val pdu = codec.constructMessage(
           s.recipient.localAddressToUse,
           s.recipient,
@@ -993,6 +1001,7 @@ private[remote] class EndpointReader(
       msgOption match {
         case Some(msg) ⇒
           if (msg.reliableDeliveryEnabled) {
+            log.info(s"Case12162: EndpointReader received SystemMessage $msg and ack $ackOption")
             ackedReceiveBuffer = ackedReceiveBuffer.receive(msg)
             deliverAndAck()
           } else try
@@ -1003,6 +1012,7 @@ private[remote] class EndpointReader(
           }
 
         case None ⇒
+          log.info(s"Case12162: EndpointReader received ack $ackOption")
       }
 
     case InboundPayload(oversized) ⇒
@@ -1035,13 +1045,18 @@ private[remote] class EndpointReader(
       replyTo ! StoppedReading(writer)
 
     case InboundPayload(p) if p.size <= transport.maximumPayloadBytes ⇒
-      val (ackOption, msgOption) = tryDecodeMessageAndAck(p)
-      for (ack ← ackOption; reliableDelivery ← reliableDeliverySupervisor) reliableDelivery ! ack
+      if (log.isWarningEnabled) {
+        val (ackOption, msgOption) = tryDecodeMessageAndAck(p)
 
-      if (log.isWarningEnabled)
-        log.warning("Discarding inbound message to [{}] in read-only association to [{}]. " +
+        msgOption match {
+          case Some(msg) ⇒ log.info(s"Case12162: EndpointReader in read-only received message $msg and ack $ackOption")
+          case None      ⇒ log.info(s"Case12162: EndpointReader in read-only received message ack $ackOption")
+        }
+
+        log.warning("Case12162: Discarding inbound message to [{}] in read-only association to [{}]. " +
           "If this happens often you may consider using akka.remote.use-passive-connections=off " +
           "or use Artery TCP.", msgOption.map(_.recipient).getOrElse("unknown"), remoteAddress)
+      }
 
     case InboundPayload(oversized) ⇒
       log.error(
