@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2014-2019 Lightbend Inc. <https://www.lightbend.com>
  */
 
 package akka.util
@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 @State(Scope.Benchmark)
 @BenchmarkMode(Array(Mode.Throughput))
-@Fork(value = 1, jvmArgsAppend = Array("-Xmx512M", "-Xms512M", "-ea", "-server", "-XX:+UseCompressedOops", "-XX:+AlwaysPreTouch", "-XX:+UseCondCardMark"))
+@Fork(value = 1, jvmArgsAppend = Array("-Xmx512M", "-Xms512M", "-XX:+AggressiveOpts", "-server", "-XX:+UseCompressedOops", "-XX:+AlwaysPreTouch", "-XX:+UseCondCardMark" /*, "-XX:+UnlockExperimentalVMOptions", "-XX:+TrustFinalNonStaticFields"*/))
 @Threads(1)
 @Warmup(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS, batchSize = 1)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS, batchSize = 1)
