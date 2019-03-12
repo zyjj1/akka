@@ -13,10 +13,10 @@ import scala.concurrent.duration._
 
 object ActorBenchmark {
   // Constants because they are used in annotations
-  final val threads = 8 // update according to cpu
+  final val threads = 12 // update according to cpu
   final val numMessagesPerActorPair = 1000000 // messages per actor pair
 
-  final val numActors = 512
+  final val numActors = 64
   final val totalMessages = numMessagesPerActorPair * numActors / 2
 }
 
@@ -36,7 +36,7 @@ class ActorBenchmark {
   var batchSize = 0
 
   //@Param(Array("akka.actor.ManyToOneArrayMailbox"))
-  @Param(Array("akka.dispatch.SingleConsumerOnlyUnboundedMailbox", "akka.actor.ManyToOneArrayMailbox", "akka.actor.JCToolsMailbox"))
+  @Param(Array("akka.dispatch.SingleConsumerOnlyUnboundedMailbox", "akka.actor.JCToolsMailbox"))
   var mailbox = ""
 
   @Param(Array("fjp-dispatcher")) //  @Param(Array("fjp-dispatcher", "affinity-dispatcher"))
@@ -53,7 +53,7 @@ class ActorBenchmark {
       s"""
        akka.actor {
 
-         default-mailbox.mailbox-capacity = 512
+         default-mailbox.mailbox-capacity = 65536
 
          fjp-dispatcher {
            executor = "fork-join-executor"

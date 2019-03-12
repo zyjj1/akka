@@ -80,6 +80,42 @@ object BenchmarkActors {
     }
   }
 
+  object EchoSenderSingleReceiver {
+    def props(echo: ActorRef, messagesPerPair: Int, latch: CountDownLatch, batchSize: Int): Props =
+      Props(new EchoSenderSingleReceiver(echo, messagesPerPair, latch, batchSize))
+  }
+
+  class EchoSenderSingleReceiver(echo: ActorRef, messagesPerPair: Int, latch: CountDownLatch, batchSize: Int) extends Actor {
+
+    private var left = messagesPerPair / 2
+    private var batch = 0
+
+    def receive = {
+      case Message ⇒
+        batch -= 1
+        if (batch <= 0) {
+          if (!sendBatch()) {
+            latch.countDown()
+            context.stop(self)
+          }
+        }
+    }
+
+    private def sendBatch(): Boolean = {
+      if (left > 0) {
+        var i = 0
+        while (i < batchSize) {
+          echo ! Message
+          i += 1
+        }
+        left -= batchSize
+        batch = batchSize
+        true
+      } else
+        false
+    }
+  }
+
   class Pipe(next: Option[ActorRef]) extends Actor {
     def receive = {
       case Message ⇒
@@ -127,6 +163,19 @@ object BenchmarkActors {
     (actors, latch)
   }
 
+  private def startEchoActorPairsSingleReceiver(messagesPerPair: Int, numPairs: Int, dispatcher: String,
+                                                batchSize: Int)(implicit system: ActorSystem) = {
+
+    val fullPathToDispatcher = "akka.actor." + dispatcher
+    // TODO shared Echo is not shutdown
+    val echo = system.actorOf(Props[Echo].withDispatcher(fullPathToDispatcher))
+    val latch = new CountDownLatch(numPairs)
+    val actors = (1 to numPairs).map { _ ⇒
+      system.actorOf(EchoSenderSingleReceiver.props(echo, messagesPerPair, latch, batchSize).withDispatcher(fullPathToDispatcher))
+    }.toVector
+    (actors, latch)
+  }
+
   private def initiateEchoPairs(refs: Vector[ActorRef]) = {
     refs.foreach(_ ! Message)
   }
@@ -156,7 +205,7 @@ object BenchmarkActors {
   def benchmarkEchoActors(numMessagesPerActorPair: Int, numActors: Int, dispatcher: String, batchSize: Int, shutdownTimeout: Duration)(implicit system: ActorSystem): Unit = {
     val numPairs = numActors / 2
     val totalNumMessages = numPairs * numMessagesPerActorPair
-    val (actors, latch) = startEchoActorPairs(numMessagesPerActorPair, numPairs, dispatcher, batchSize)
+    val (actors, latch) = startEchoActorPairsSingleReceiver(numMessagesPerActorPair, numPairs, dispatcher, batchSize)
     val startNanoTime = System.nanoTime()
     initiateEchoPairs(actors)
     latch.await(shutdownTimeout.toSeconds, TimeUnit.SECONDS)
