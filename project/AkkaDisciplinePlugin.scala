@@ -46,7 +46,7 @@ object AkkaDisciplinePlugin extends AutoPlugin with ScalafixSupport {
       !VersionNumber(scalaVersion.value).matchesSemVer(SemanticSelector("<=2.11.1"))
     })
 
-  val silencerVersion = "1.3.1"
+  val silencerVersion = "1.3.3"
   lazy val silencerSettings = Seq(
     libraryDependencies ++= Seq(
       compilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion),
@@ -64,7 +64,7 @@ object AkkaDisciplinePlugin extends AutoPlugin with ScalafixSupport {
                                  disciplineScalacOptions -- undisciplineScalacOptions
                                }).toSeq,
       Compile / scalacOptions ++= (
-        if (fatalWarningsFor(name.value)) Seq("-Xfatal-warnings")
+        if (!scalaVersion.value.startsWith("2.13") && fatalWarningsFor(name.value)) Seq("-Xfatal-warnings")
         else Seq.empty
       ),
       Compile / console / scalacOptions --= Seq("-deprecation", "-Xfatal-warnings", "-Xlint", "-Ywarn-unused:imports"),

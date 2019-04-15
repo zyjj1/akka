@@ -11,6 +11,8 @@ import akka.cluster.ClusterSettings.DataCenter
 
 import scala.runtime.AbstractFunction2
 
+import com.github.ghik.silencer.silent
+
 /**
  * Represents the address, current status, and roles of a cluster member node.
  *
@@ -48,6 +50,7 @@ class Member private[cluster] (
   /**
    * Java API
    */
+  @silent
   def getRoles: java.util.Set[String] =
     scala.collection.JavaConverters.setAsJavaSetConverter(roles).asJava
 

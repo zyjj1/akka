@@ -14,6 +14,8 @@ import akka.actor._
 import akka.serialization.{ Serialization, SerializationExtension, Serializers }
 import akka.util.{ Helpers, Unsafe }
 
+import com.github.ghik.silencer.silent
+
 private[akka] object Children {
   val GetNobody = () => Nobody
 }
@@ -29,6 +31,7 @@ private[akka] trait Children { this: ActorCell =>
     Unsafe.instance.getObjectVolatile(this, AbstractActorCell.childrenOffset).asInstanceOf[ChildrenContainer]
 
   final def children: immutable.Iterable[ActorRef] = childrenRefs.children
+  @silent
   final def getChildren(): java.lang.Iterable[ActorRef] =
     scala.collection.JavaConverters.asJavaIterableConverter(children).asJava
 

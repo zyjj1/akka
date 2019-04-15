@@ -14,7 +14,7 @@ import akka.stream.{ AbruptIOTerminationException, IOResult }
 import akka.stream.actor.{ ActorSubscriberMessage, WatermarkRequestStrategy }
 import akka.util.ByteString
 
-import scala.collection.JavaConverters._
+import akka.util.ccompat.JavaConverters._
 import scala.concurrent.Promise
 import scala.util.{ Failure, Success, Try }
 

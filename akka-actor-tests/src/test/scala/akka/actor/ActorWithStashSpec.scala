@@ -15,6 +15,8 @@ import scala.concurrent.duration._
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.junit.JUnitSuiteLike
 
+import com.github.ghik.silencer.silent
+
 object ActorWithStashSpec {
 
   class StashingActor extends Actor with Stash {
@@ -100,6 +102,7 @@ object ActorWithStashSpec {
 
 }
 
+@silent
 class JavaActorWithStashSpec extends StashJavaAPI with JUnitSuiteLike
 
 class ActorWithStashSpec extends AkkaSpec(ActorWithStashSpec.testConf) with DefaultTimeout with BeforeAndAfterEach {

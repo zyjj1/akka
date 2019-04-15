@@ -10,6 +10,8 @@ import akka.actor.{ ActorSystem, Address }
 
 import scala.runtime.AbstractFunction2
 
+import com.github.ghik.silencer.silent
+
 @SerialVersionUID(1L)
 sealed trait RemotingLifecycleEvent extends Serializable {
   def logLevel: Logging.LogLevel
@@ -58,6 +60,7 @@ final case class AssociationErrorEvent(
 
 @SerialVersionUID(1L)
 final case class RemotingListenEvent(listenAddresses: Set[Address]) extends RemotingLifecycleEvent {
+  @silent
   def getListenAddresses: java.util.Set[Address] =
     scala.collection.JavaConverters.setAsJavaSetConverter(listenAddresses).asJava
   override def logLevel: Logging.LogLevel = Logging.InfoLevel

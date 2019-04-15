@@ -743,7 +743,7 @@ object Logging {
      * Java API: Retrieve the contents of the MDC.
      */
     def getMDC: java.util.Map[String, Any] = {
-      import scala.collection.JavaConverters._
+      import akka.util.ccompat.JavaConverters._
       mdc.asJava
     }
   }
@@ -1554,7 +1554,7 @@ trait DiagnosticLoggingAdapter extends LoggingAdapter {
 
   import Logging._
 
-  import scala.collection.JavaConverters._
+  import akka.util.ccompat.JavaConverters._
 
   private var _mdc = emptyMDC
 

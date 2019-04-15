@@ -722,7 +722,7 @@ abstract class GraphStageLogic private[stream] (val inCount: Int, val outCount: 
       andThen: Procedure[java.util.List[T]],
       onClose: Procedure[java.util.List[T]]): Unit = {
     //FIXME `onClose` is a poor name for `onComplete` rename this at the earliest possible opportunity
-    import collection.JavaConverters._
+    import akka.util.ccompat.JavaConverters._
     readN(in, n)(seq => andThen(seq.asJava), seq => onClose(seq.asJava))
   }
 
@@ -831,7 +831,7 @@ abstract class GraphStageLogic private[stream] (val inCount: Int, val outCount: 
    * signal.
    */
   final protected def emitMultiple[T](out: Outlet[T], elems: java.util.Iterator[T]): Unit = {
-    import collection.JavaConverters._
+    import akka.util.ccompat.JavaConverters._
     emitMultiple(out, elems.asScala, DoNothing)
   }
 
@@ -844,7 +844,7 @@ abstract class GraphStageLogic private[stream] (val inCount: Int, val outCount: 
    * signal.
    */
   final protected def emitMultiple[T](out: Outlet[T], elems: java.util.Iterator[T], andThen: Effect): Unit = {
-    import collection.JavaConverters._
+    import akka.util.ccompat.JavaConverters._
     emitMultiple(out, elems.asScala, andThen.apply _)
   }
 
