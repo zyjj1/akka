@@ -5,6 +5,7 @@
 package akka.persistence.fsm
 
 import akka.actor._
+import akka.annotation.InternalApi
 import akka.japi.pf.{ FSMTransitionHandlerBuilder, UnitMatch, UnitPFBuilder }
 
 import language.implicitConversions
@@ -526,7 +527,11 @@ trait PersistentFSMBase[S, D, E] extends Actor with Listeners with ActorLogging 
     super.postStop()
   }
 
-  private def terminate(nextState: State): Unit = {
+  /**
+   * INTERNAL API
+   */
+  @InternalApi
+  private[fsm] def terminate(nextState: State): Unit = {
     if (currentState.stopReason.isEmpty) {
       val reason = nextState.stopReason.get
       logTermination(reason)

@@ -480,6 +480,12 @@ abstract class AbstractPersistentFSM[S <: FSMState, D, E]
    * Used for identifying domain events during recovery
    */
   def domainEventClass: Class[E]
+
+  override def receive: Receive = super.receive
+
+  @throws(classOf[Exception])
+  override def postStop(): Unit =
+    super.postStop()
 }
 
 /**

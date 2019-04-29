@@ -445,14 +445,12 @@ class SerializationCompatibilitySpec extends AkkaSpec(SerializationTests.mostlyR
     "be preserved for the NoMessage SystemMessage" in {
       val expected =
         if (util.Properties.versionNumberString.startsWith("2.11") || util.Properties.versionNumberString.startsWith(
-          "2.12"))
+              "2.12"))
           "aced00057372001f616b6b612e64697370617463682e7379736d73672e4e6f4d6573736167652400" +
-        "000000000000010200007870"
+          "000000000000010200007870"
         else
           "aced0005737200267363616c612e72756e74696d652e4d6f64756c6553657269616c697a6174696f6e50726f787900000000000000010200014c000b6d6f64756c65436c6173737400114c6a6176612f6c616e672f436c6173733b78707672001f616b6b612e64697370617463682e7379736d73672e4e6f4d6573736167652400000000000000010200007870"
-      verify(
-        NoMessage,
-        expected)
+      verify(NoMessage, expected)
     }
     "be preserved for the Failed SystemMessage" in {
       // Using null as the cause to avoid a large serialized message and JDK differences

@@ -138,6 +138,8 @@ object ByteString {
 
   val empty: ByteString = CompactByteString(Array.empty[Byte])
 
+  // 'empty' is no longer visible from Java because of
+  // https://github.com/scala/scala/pull/7929
   /** Java API */
   val emptyString: ByteString = CompactByteString(Array.empty[Byte])
 
