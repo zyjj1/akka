@@ -170,7 +170,8 @@ import scala.util.Random
     else
       reachableMembersInDc
         .find(m => leaderMemberStatus(m.status))
-        .orElse(Some(reachableMembersInDc.min(Member.leaderStatusOrdering)))
+        // Workaround for https://github.com/scala/bug/issues/11507
+        .orElse(Some(reachableMembersInDc.reduceLeft(Member.leaderStatusOrdering.min)))
         .map(_.uniqueAddress)
   }
 
