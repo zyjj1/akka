@@ -892,8 +892,9 @@ private[akka] class DDataShard(
     case StoreFailure(_, Some((`evt`, _))) =>
       log.error(
         "The DDataShard was unable to update state with event {} due to StoreFailure. " +
-        "Shard will be restarted.",
+        "Shard will be restarted after backoff.",
         evt)
+      context.stop(self)
 
     case ModifyFailure(_, error, cause, Some((`evt`, _))) =>
       log.error(
@@ -938,20 +939,25 @@ private[akka] class DDataShard(
     } else {
       payload match {
         case _: ShardRegion.StartEntity =>
+          // in case it was wrapped, used in Typed
           stash()
         case _ =>
           if (id == waitingForUpdateEvent.entityId) {
+            // FIXME remove this log
+            log.debug("Buffering to [{}] while waiting for DDataShard update of {}", id, waitingForUpdateEvent)
             appendToMessageBuffer(id, msg, sender())
           } else {
             val name = URLEncoder.encode(id, "utf-8")
             // messageBuffers.contains(id) when passivation is in progress
             if (!messageBuffers.contains(id) && context.child(name).nonEmpty) {
               // FIXME remove this log
-              log.debug("Immediate delivery to [{}] DDataShard update of {}", id, waitingForUpdateEvent)
+              log.debug(
+                "Immediate delivery to [{}] while waiting for DDataShard update of {}",
+                id,
+                waitingForUpdateEvent)
               deliverTo(id, msg, payload, sender())
             } else {
-              // FIXME remove msg from log
-              log.debug("Stashing [{}] while waiting for DDataShard update of {}", msg, waitingForUpdateEvent)
+              log.debug("Stashing to [{}] while waiting for DDataShard update of {}", id, waitingForUpdateEvent)
               stash()
             }
           }

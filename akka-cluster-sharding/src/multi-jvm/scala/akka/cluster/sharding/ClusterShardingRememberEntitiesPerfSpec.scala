@@ -65,8 +65,8 @@ object ClusterShardingRememberEntitiesPerfSpecConfig extends MultiNodeConfig {
     akka.cluster.sharding.distributed-data.durable.lmdb {
       dir = target/ShardingRememberEntitiesPerfSpec/sharding-ddata
     }
-    # remove comment on next line to disable durable lmdb storage
-    #akka.cluster.sharding.distributed-data.durable.keys = []
+    # comment next line to enable durable lmdb storage
+    akka.cluster.sharding.distributed-data.durable.keys = []
     """).withFallback(MultiNodeClusterSpec.clusterConfig))
 
   nodeConfig(third)(ConfigFactory.parseString(s"""
@@ -126,10 +126,10 @@ abstract class ClusterShardingRememberEntitiesPerfSpec
   lazy val region2 = ClusterSharding(system).shardRegion("Entity2")
   lazy val region3 = ClusterSharding(system).shardRegion("Entity3")
 
-  // FIXME decrease to 2
-  private val nrIterations = 10
-  // FIXME decrease to 1
-  private val numberOfMessagesFactor = 5
+  // use 5 for "real" testing
+  private val nrIterations = 2
+  // use 5 for "real" testing
+  private val numberOfMessagesFactor = 1
 
   s"Cluster sharding with remember entities performance" must {
 
