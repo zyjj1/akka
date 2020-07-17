@@ -10,7 +10,6 @@ import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.persistence.testkit.PersistenceTestKitPlugin
 import akka.persistence.testkit.query.scaladsl.PersistenceTestKitReadJournal
-import akka.persistence.typed.LwwTime
 import akka.persistence.typed.ReplicaId
 import akka.persistence.typed.crdt.LwwTime
 import akka.persistence.typed.scaladsl._
