@@ -373,7 +373,7 @@ import akka.remote.artery.ThisActorSystemQuarantinedEvent
         .pipeTo(self))
   }
 
-  def waitingForLease(decision: Decision): Receive = {
+  def waitingForLease(decision: AcquireLeaseDecision): Receive = {
     case AcquireLease =>
       acquireLease() // reply message is LeaseResult
 
