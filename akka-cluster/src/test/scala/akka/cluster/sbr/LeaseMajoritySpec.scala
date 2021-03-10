@@ -10,20 +10,21 @@ import org.scalatest.concurrent.Eventually
 
 class LeaseMajoritySpec extends AkkaSpec() with Eventually {
 
-  val default = ConfigFactory
-    .parseString(
-      """
-      | akka.cluster.split-brain-resolver.lease-majority.lease-implementation = "akka.coordination.lease.kubernetes" 
-      |""".stripMargin)
+  val default = ConfigFactory.parseString(
+    """
+    akka.cluster.split-brain-resolver.lease-majority.lease-implementation = "akka.coordination.lease.kubernetes" 
+    """)
     .withFallback(ConfigFactory.load())
-  val blank = ConfigFactory.parseString("""
-                                           |akka.cluster.split-brain-resolver.lease-majority {
-                                           |  lease-name = " "
-                                           |}""".stripMargin).withFallback(default)
-  val named = ConfigFactory.parseString("""
-                                           |akka.cluster.split-brain-resolver.lease-majority {
-                                           |  lease-name = "shopping-cart-akka-sbr"
-                                           |}""".stripMargin).withFallback(default)
+  val blank = ConfigFactory.parseString(
+    """
+    akka.cluster.split-brain-resolver.lease-majority {
+      lease-name = " "
+    }""").withFallback(default)
+  val named = ConfigFactory.parseString(
+     """
+     akka.cluster.split-brain-resolver.lease-majority {
+       lease-name = "shopping-cart-akka-sbr"
+     }""").withFallback(default)
 
   "Split Brain Resolver Lease Majority provider" must {
 
