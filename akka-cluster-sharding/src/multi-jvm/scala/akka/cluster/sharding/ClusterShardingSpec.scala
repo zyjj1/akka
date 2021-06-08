@@ -22,6 +22,8 @@ import akka.remote.testconductor.RoleName
 import akka.testkit._
 import akka.testkit.TestEvent.Mute
 
+import scala.annotation.nowarn
+
 object ClusterShardingSpec {
   //#counter-actor
   case object Increment
@@ -78,6 +80,7 @@ object ClusterShardingSpec {
     case EntityEnvelope(id, _)       => (id % numberOfShards).toString
     case Get(id)                     => (id % numberOfShards).toString
     case ShardRegion.StartEntity(id) => (id.toLong % numberOfShards).toString
+    case _                           => throw new IllegalArgumentException()
   }
 
   def qualifiedCounterProps(typeName: String): Props =
@@ -193,6 +196,7 @@ object ClusterShardingDocCode {
     case ShardRegion.StartEntity(id) =>
       // StartEntity is used by remembering entities feature
       (id.toLong % numberOfShards).toString
+    case _ => throw new IllegalArgumentException()
   }
   //#counter-extractor
 
@@ -204,6 +208,7 @@ object ClusterShardingDocCode {
       case ShardRegion.StartEntity(id) =>
         // StartEntity is used by remembering entities feature
         (id.toLong % numberOfShards).toString
+      case _ => throw new IllegalArgumentException()
     }
     //#extractShardId-StartEntity
     extractShardId.toString() // keep the compiler happy
@@ -270,6 +275,7 @@ class DDataClusterShardingWithEntityRecoveryMultiJvmNode5 extends DDataClusterSh
 class DDataClusterShardingWithEntityRecoveryMultiJvmNode6 extends DDataClusterShardingWithEntityRecoverySpec
 class DDataClusterShardingWithEntityRecoveryMultiJvmNode7 extends DDataClusterShardingWithEntityRecoverySpec
 
+@nowarn("msg=deprecated")
 abstract class ClusterShardingSpec(multiNodeConfig: ClusterShardingSpecConfig)
     extends MultiNodeClusterShardingSpec(multiNodeConfig)
     with ImplicitSender
@@ -368,6 +374,7 @@ abstract class ClusterShardingSpec(multiNodeConfig: ClusterShardingSpecConfig)
           case ClusterShardingSettings.RememberEntitiesStoreDData => Some(ddataRememberEntitiesProvider(typeName))
           case ClusterShardingSettings.RememberEntitiesStoreEventsourced =>
             Some(eventSourcedRememberEntitiesProvider(typeName, settings))
+          case _ => fail()
         }
 
     system.actorOf(
@@ -1002,6 +1009,7 @@ abstract class ClusterShardingSpec(multiNodeConfig: ClusterShardingSpecConfig)
             receiveOne(3 seconds) match {
               case ActorIdentity(id, Some(_)) if id == n => count = count + 1
               case ActorIdentity(_, None)                => //Not on the fifth shard
+              case _                                     => fail()
             }
           }
           count should be >= (2)

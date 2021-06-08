@@ -67,6 +67,18 @@ private[akka] final class BehaviorSetup[C, E, S](
   val journal: ClassicActorRef = persistence.journalFor(settings.journalPluginId)
   val snapshotStore: ClassicActorRef = persistence.snapshotStoreFor(settings.snapshotPluginId)
 
+  val isSnapshotOptional: Boolean =
+    Persistence(context.system.classicSystem).configFor(snapshotStore).getBoolean("snapshot-is-optional")
+
+  if (isSnapshotOptional && (retention match {
+        case SnapshotCountRetentionCriteriaImpl(_, _, true) => true
+        case _                                              => false
+      })) {
+    throw new IllegalArgumentException(
+      "Retention criteria with delete events can't be used together with snapshot-is-optional=false. " +
+      "That can result in wrong recovered state if snapshot load fails.")
+  }
+
   val replicaId: Option[ReplicaId] = replication.map(_.replicaId)
 
   def selfClassic: ClassicActorRef = context.self.toClassic
@@ -102,7 +114,7 @@ private[akka] final class BehaviorSetup[C, E, S](
   def cancelRecoveryTimer(): Unit = {
     recoveryTimer match {
       case OptionVal.Some(t) => t.cancel()
-      case OptionVal.None    =>
+      case _                 =>
     }
     recoveryTimer = OptionVal.None
   }
@@ -141,6 +153,7 @@ private[akka] final class BehaviorSetup[C, E, S](
         if (s.snapshotWhen(sequenceNr)) SnapshotWithRetention
         else if (snapshotWhen(state, event, sequenceNr)) SnapshotWithoutRetention
         else NoSnapshot
+      case unexpected => throw new IllegalStateException(s"Unexpected retention criteria: $unexpected")
     }
   }
 

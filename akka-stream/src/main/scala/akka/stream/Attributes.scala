@@ -17,9 +17,11 @@ import akka.annotation.InternalApi
 import akka.event.Logging
 import akka.japi.function
 import akka.stream.impl.TraversalBuilder
-import akka.util.{ ByteString, OptionVal }
+import akka.util.ByteString
 import akka.util.JavaDurationConverters._
 import akka.util.LineNumbers
+
+import scala.util.control.NonFatal
 
 /**
  * Holds attributes which can be used to alter [[akka.stream.scaladsl.Flow]] / [[akka.stream.javadsl.Flow]]
@@ -120,17 +122,14 @@ final case class Attributes(attributeList: List[Attributes.Attribute] = Nil) {
    */
   def getMandatoryAttribute[T <: MandatoryAttribute](c: Class[T]): T = {
     @tailrec
-    def find(list: List[Attribute]): OptionVal[Attribute] = list match {
-      case Nil => OptionVal.None
+    def find(list: List[Attribute]): T = list match {
+      case Nil => throw new IllegalStateException(s"Mandatory attribute [$c] not found")
       case head :: tail =>
-        if (c.isInstance(head)) OptionVal.Some(head)
+        if (c.isInstance(head)) c.cast(head)
         else find(tail)
     }
 
-    find(attributeList) match {
-      case OptionVal.Some(t) => t.asInstanceOf[T]
-      case OptionVal.None    => throw new IllegalStateException(s"Mandatory attribute [$c] not found")
-    }
+    find(attributeList)
   }
 
   /**
@@ -308,7 +307,7 @@ object Attributes {
    * for debugging. Included in the default toString of GraphStageLogic if present
    */
   final class SourceLocation(lambda: AnyRef) extends Attribute {
-    lazy val locationName: String = {
+    lazy val locationName: String = try {
       val locationName = LineNumbers(lambda) match {
         case LineNumbers.NoSourceInfo           => "unknown"
         case LineNumbers.UnknownSourceFormat(_) => "unknown"
@@ -317,6 +316,8 @@ object Attributes {
           s"$filename:$from"
       }
       s"${lambda.getClass.getPackage.getName}-$locationName"
+    } catch {
+      case NonFatal(_) => "unknown" // location is not critical so give up without failing
     }
 
     override def toString: String = locationName

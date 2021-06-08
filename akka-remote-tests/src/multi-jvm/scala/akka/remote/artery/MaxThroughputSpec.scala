@@ -7,11 +7,8 @@ package akka.remote.artery
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.NANOSECONDS
-
 import scala.concurrent.duration._
-
 import com.typesafe.config.ConfigFactory
-
 import akka.actor._
 import akka.remote.{ RARP, RemoteActorRefProvider, RemotingMultiNodeSpec }
 import akka.remote.artery.compress.CompressionProtocol.Events.ReceivedActorRefCompressionTable
@@ -21,6 +18,8 @@ import akka.serialization.{ ByteBufferSerializer, SerializerWithStringManifest }
 import akka.serialization.jackson.CborSerializable
 import akka.testkit._
 
+import java.io.NotSerializableException
+
 object MaxThroughputSpec extends MultiNodeConfig {
   val first = role("first")
   val second = role("second")
@@ -29,7 +28,7 @@ object MaxThroughputSpec extends MultiNodeConfig {
 
   val cfg = ConfigFactory.parseString(s"""
      # for serious measurements you should increase the totalMessagesFactor (80)
-     akka.test.MaxThroughputSpec.totalMessagesFactor = 10.0
+     akka.test.MaxThroughputSpec.totalMessagesFactor = 160.0
      akka.test.MaxThroughputSpec.real-message = off
      akka.test.MaxThroughputSpec.actor-selection = off
      akka {
@@ -326,6 +325,7 @@ object MaxThroughputSpec extends MultiNodeConfig {
     override def manifest(o: AnyRef): String =
       o match {
         case _: FlowControl => FlowControlManifest
+        case _              => throw new NotSerializableException()
       }
 
     override def toBinary(o: AnyRef, buf: ByteBuffer): Unit =
@@ -333,11 +333,13 @@ object MaxThroughputSpec extends MultiNodeConfig {
         case FlowControl(id, burstStartTime) =>
           buf.putInt(id)
           buf.putLong(burstStartTime)
+        case _ => throw new NotSerializableException()
       }
 
     override def fromBinary(buf: ByteBuffer, manifest: String): AnyRef =
       manifest match {
         case FlowControlManifest => FlowControl(buf.getInt, buf.getLong)
+        case _                   => throw new NotSerializableException()
       }
 
     override def toBinary(o: AnyRef): Array[Byte] = o match {
@@ -348,6 +350,7 @@ object MaxThroughputSpec extends MultiNodeConfig {
         val bytes = new Array[Byte](buf.remaining)
         buf.get(bytes)
         bytes
+      case _ => throw new NotSerializableException()
     }
 
     override def fromBinary(bytes: Array[Byte], manifest: String): AnyRef =

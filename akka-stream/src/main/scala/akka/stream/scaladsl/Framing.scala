@@ -83,6 +83,7 @@ object Framing {
    *                           For example, frame can have a shape like this: `[offset bytes][body size bytes][body bytes][footer bytes]`.
    *                           Then computeFrameSize can be used to compute the frame size: `(offset bytes, computed size) => (actual frame size)`.
    *                           ''Actual frame size'' must be equal or bigger than sum of `fieldOffset` and `fieldLength`, the operator fails otherwise.
+   *                           Must not mutate the given byte array.
    *
    */
   def lengthField(
@@ -255,7 +256,7 @@ object Framing {
           // Retrive previous position
           val previous = indices.lastOption match {
             case OptionVal.Some((_, i)) => i + separatorBytes.size
-            case OptionVal.None         => 0
+            case _                      => 0
           }
 
           if (possibleMatchPos - previous > maximumLineBytes) {
@@ -315,7 +316,7 @@ object Framing {
         private def reset(): Unit = {
           val previous = indices.lastOption match {
             case OptionVal.Some((_, i)) => i + separatorBytes.size
-            case OptionVal.None         => 0
+            case _                      => 0
           }
 
           buffer = buffer.drop(previous).compact
@@ -378,6 +379,7 @@ object Framing {
     private val intDecoder = byteOrder match {
       case ByteOrder.BIG_ENDIAN    => bigEndianDecoder
       case ByteOrder.LITTLE_ENDIAN => littleEndianDecoder
+      case _                       => throw new RuntimeException() // won't happen, compiler exhaustiveness check pleaser
     }
 
     val in = Inlet[ByteString]("LengthFieldFramingStage.in")
@@ -414,7 +416,7 @@ object Framing {
           } else if (buffSize >= minimumChunkSize) {
             val parsedLength = intDecoder(buffer.iterator.drop(lengthFieldOffset), lengthFieldLength)
             frameSize = computeFrameSize match {
-              case Some(f) => f(buffer.take(lengthFieldOffset).toArray, parsedLength)
+              case Some(f) => f(buffer.take(lengthFieldOffset).toArrayUnsafe(), parsedLength)
               case None    => parsedLength + minimumChunkSize
             }
             if (frameSize > maximumFrameLength) {

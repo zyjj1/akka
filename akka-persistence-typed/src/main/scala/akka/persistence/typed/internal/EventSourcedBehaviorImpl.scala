@@ -108,7 +108,7 @@ private[akka] final case class EventSourcedBehaviorImpl[Command, Event, State](
     throw new IllegalArgumentException("persistenceId must not be null")
 
   // Don't use it directly, but instead call internalLogger() (see below)
-  private val logger = LoggerFactory.getLogger(this.getClass)
+  private val loggerForInternal = LoggerFactory.getLogger(this.getClass)
 
   override def apply(context: typed.TypedActorContext[Command]): Behavior[Command] = {
     val ctx = context.asScala
@@ -124,10 +124,13 @@ private[akka] final case class EventSourcedBehaviorImpl[Command, Event, State](
 
     // This method ensures that the MDC is set before we use the internal logger
     def internalLogger() = {
-      // MDC is cleared (if used) from aroundReceive in ActorAdapter after processing each message,
-      // but important to call `context.log` to mark MDC as used
-      ctx.log
-      logger
+      if (settings.useContextLoggerForInternalLogging) ctx.log
+      else {
+        // MDC is cleared (if used) from aroundReceive in ActorAdapter after processing each message,
+        // but important to call `context.log` to mark MDC as used
+        ctx.log
+        loggerForInternal
+      }
     }
 
     val actualSignalHandler: PartialFunction[(State, Signal), Unit] = signalHandler.orElse {
@@ -199,7 +202,7 @@ private[akka] final case class EventSourcedBehaviorImpl[Command, Event, State](
                 case res: SnapshotProtocol.Response          => InternalProtocol.SnapshotterResponse(res)
                 case RecoveryPermitter.RecoveryPermitGranted => InternalProtocol.RecoveryPermitGranted
                 case internal: InternalProtocol              => internal // such as RecoveryTickEvent
-                case cmd: Command @unchecked                 => InternalProtocol.IncomingCommand(cmd)
+                case cmd                                     => InternalProtocol.IncomingCommand(cmd.asInstanceOf[Command])
               }
               target(ctx, innerMsg)
             }
@@ -375,6 +378,11 @@ private[akka] final case class PublishedEventImpl(
   def event: Any = payload match {
     case Tagged(event, _) => event
     case _                => payload
+  }
+
+  override def withoutTags: PublishedEvent = payload match {
+    case Tagged(event, _) => copy(payload = event)
+    case _                => this
   }
 
   override def getReplicatedMetaData: Optional[ReplicatedPublishedEventMetaData] = replicatedMetaData.asJava

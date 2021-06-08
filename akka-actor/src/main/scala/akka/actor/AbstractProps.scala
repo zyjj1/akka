@@ -65,6 +65,8 @@ private[akka] trait AbstractProps {
       case c: Class[_] if c == coc =>
         throw new IllegalArgumentException(
           "erased Creator types (e.g. lambdas) are unsupported, use Props.create(actorClass, creator) instead")
+      case unexpected =>
+        throw new IllegalArgumentException(s"unexpected type: $unexpected")
     }
     create(classOf[CreatorConsumer], actorClass, creator)
   }
@@ -73,6 +75,7 @@ private[akka] trait AbstractProps {
    * Create new Props from the given [[akka.japi.Creator]] with the type set to the given actorClass.
    */
   def create[T <: Actor](actorClass: Class[T], creator: Creator[T]): Props = {
+    checkCreatorClosingOver(creator.getClass)
     create(classOf[CreatorConsumer], actorClass, creator)
   }
 

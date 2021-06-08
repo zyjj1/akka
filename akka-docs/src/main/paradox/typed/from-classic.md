@@ -117,6 +117,9 @@ for creating top level actors. Instead, there is a single top level actor define
 when starting the `ActorSystem`. Other actors are started as children of that user guardian actor or
 children of other actors in the actor hierarchy. This is explained more in @ref:[ActorSystem](#actorsystem).
 
+Note that when mixing classic and typed and have a classic system, spawning top level actors from the side is possible, see
+@ref:[Coexistence](coexisting.md#top-level-typed-actor-classic-system).
+
 The `actorOf` method takes an `akka.actor.Props` parameter, which is like a factory for creating the actor instance, and it's
 also used when creating a new instance when the actor is restarted. The `Props` may also define additional
 properties such as which dispatcher to use for the actor.
@@ -156,7 +159,10 @@ typically performed from the "outside".
 
 The `actorOf` method of the classic `ActorSystem` is typically used to create a few (or many) top level actors. The
 `ActorSystem` in Typed doesn't have that capability. Instead, such actors are started as children of
-the user guardian actor or children of other actors in the actor hierarchy.
+the user guardian actor or children of other actors in the actor hierarchy. The rationale for this is partly about consistency. 
+In a typed system you can’t create children to an arbitrary actor from anywhere in your app without messaging it, 
+so this will also hold true for the user guardian actor. That noted, in cases where you do need to spawn outside of this guardian 
+then you can use the @ref:[`SpawnProtocol`](./actor-lifecycle.md#spawnprotocol) to spawn as needed.
 
 ## become
 

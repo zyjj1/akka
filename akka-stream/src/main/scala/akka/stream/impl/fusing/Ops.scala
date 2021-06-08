@@ -15,7 +15,7 @@ import akka.stream.Attributes.{ InputBuffer, LogLevels }
 import akka.stream.OverflowStrategies._
 import akka.stream.impl.Stages.DefaultAttributes
 import akka.stream.impl.fusing.GraphStages.SimpleLinearGraphStage
-import akka.stream.impl.{ ReactiveStreamsCompliance, Buffer => BufferImpl }
+import akka.stream.impl.{ ReactiveStreamsCompliance, Buffer => BufferImpl, ContextPropagation }
 import akka.stream.scaladsl.{ DelayStrategy, Source }
 import akka.stream.stage._
 import akka.stream.{ Supervision, _ }
@@ -78,6 +78,7 @@ import akka.util.ccompat._
       def decider = inheritedAttributes.mandatoryAttribute[SupervisionStrategy].decider
 
       private var buffer: OptionVal[T] = OptionVal.none
+      private val contextPropagation = ContextPropagation()
 
       override def preStart(): Unit = pull(in)
       override def onPush(): Unit =
@@ -87,9 +88,10 @@ import akka.util.ccompat._
             if (isAvailable(out)) {
               push(out, elem)
               pull(in)
-            } else
+            } else {
               buffer = OptionVal.Some(elem)
-          else pull(in)
+              contextPropagation.suspendContext()
+            } else pull(in)
         } catch {
           case NonFatal(ex) =>
             decider(ex) match {
@@ -101,6 +103,7 @@ import akka.util.ccompat._
       override def onPull(): Unit =
         buffer match {
           case OptionVal.Some(value) =>
+            contextPropagation.resumeContext()
             push(out, value)
             buffer = OptionVal.none
             if (!isClosed(in)) pull(in)
@@ -166,10 +169,12 @@ import akka.util.ccompat._
       override def onPush(): Unit = {
         val elem = grab(in)
         withSupervision(() => p(elem)) match {
-          case Some(flag) if flag => pull(in)
-          case Some(flag) if !flag =>
-            push(out, elem)
-            setHandler(in, rest)
+          case Some(flag) =>
+            if (flag) pull(in)
+            else {
+              push(out, elem)
+              setHandler(in, rest)
+            }
           case None => // do nothing
         }
       }
@@ -245,6 +250,7 @@ private[stream] object Collect {
           result match {
             case NotApplied             => pull(in)
             case result: Out @unchecked => push(out, result)
+            case _                      => throw new RuntimeException() // won't happen, compiler exhaustiveness check pleaser
           }
         case None => //do nothing
       }
@@ -298,6 +304,7 @@ private[stream] object Collect {
               recovered = Some(result)
             }
           }
+          case _ => throw new RuntimeException() // won't happen, compiler exhaustiveness check pleaser
         } catch {
           case NonFatal(ex) => failStage(ex)
         }
@@ -523,12 +530,15 @@ private[stream] object Collect {
       }
 
       private val futureCB = getAsyncCallback[Try[Out]] {
-        case Success(next) if next != null =>
-          current = next
-          pushAndPullOrFinish(next)
-          elementHandled = true
-        case Success(null) => doSupervision(ReactiveStreamsCompliance.elementMustNotBeNullException)
-        case Failure(t)    => doSupervision(t)
+        case Success(next) =>
+          if (next != null) {
+            current = next
+            pushAndPullOrFinish(next)
+            elementHandled = true
+          } else {
+            doSupervision(ReactiveStreamsCompliance.elementMustNotBeNullException)
+          }
+        case Failure(t) => doSupervision(t)
       }.invoke _
 
       setHandlers(in, out, ZeroHandler)
@@ -663,8 +673,10 @@ private[stream] object Collect {
         case other =>
           val ex = other match {
             case Failure(t) => t
-            case Success(s) if s == null =>
+            case Success(null) =>
               ReactiveStreamsCompliance.elementMustNotBeNullException
+            case Success(_) =>
+              throw new IllegalArgumentException() // won't happen, compiler exhaustiveness check pleaser
           }
           val supervision = decider(ex)
 
@@ -1050,6 +1062,7 @@ private[stream] object Collect {
       private var agg: Out = null.asInstanceOf[Out]
       private var left: Long = max
       private var pending: In = null.asInstanceOf[In]
+      private val contextPropagation = ContextPropagation()
 
       private def flush(): Unit = {
         if (agg != null) {
@@ -1080,6 +1093,7 @@ private[stream] object Collect {
       def onPush(): Unit = {
         val elem = grab(in)
         val cost = costFn(elem)
+        contextPropagation.suspendContext()
 
         if (agg == null) {
           try {
@@ -1124,6 +1138,7 @@ private[stream] object Collect {
           if (isClosed(in)) completeStage()
           else if (!hasBeenPulled(in)) pull(in)
         } else if (isClosed(in)) {
+          contextPropagation.resumeContext()
           push(out, agg)
           if (pending == null) completeStage()
           else {
@@ -1142,6 +1157,7 @@ private[stream] object Collect {
             pending = null.asInstanceOf[In]
           }
         } else {
+          contextPropagation.resumeContext()
           flush()
           if (!hasBeenPulled(in)) pull(in)
         }
@@ -1173,12 +1189,14 @@ private[stream] object Collect {
   override def createLogic(attr: Attributes) = new GraphStageLogic(shape) with InHandler with OutHandler {
     private var iterator: Iterator[Out] = Iterator.empty
     private var expanded = false
+    private val contextPropagation = ContextPropagation()
 
     override def preStart(): Unit = pull(in)
 
     def onPush(): Unit = {
       iterator = extrapolate(grab(in))
       if (iterator.hasNext) {
+        contextPropagation.suspendContext()
         if (isAvailable(out)) {
           expanded = true
           pull(in)
@@ -1194,6 +1212,7 @@ private[stream] object Collect {
 
     def onPull(): Unit = {
       if (iterator.hasNext) {
+        contextPropagation.resumeContext()
         if (!expanded) {
           expanded = true
           if (isClosed(in)) {
@@ -1227,7 +1246,7 @@ private[stream] object Collect {
     def supervisionDirectiveFor(decider: Supervision.Decider, ex: Throwable): Supervision.Directive = {
       cachedSupervisionDirective match {
         case OptionVal.Some(d) => d
-        case OptionVal.None =>
+        case _ =>
           val d = decider(ex)
           cachedSupervisionDirective = OptionVal.Some(d)
           d
@@ -1319,13 +1338,15 @@ private[stream] object Collect {
         else if (isAvailable(out)) {
           val holder = buffer.dequeue()
           holder.elem match {
-            case Success(elem) if elem != null =>
-              push(out, elem)
-              pullIfNeeded()
-
-            case Success(null) =>
-              pullIfNeeded()
-              pushNextIfPossible()
+            case Success(elem) =>
+              if (elem != null) {
+                push(out, elem)
+                pullIfNeeded()
+              } else {
+                // elem is null
+                pullIfNeeded()
+                pushNextIfPossible()
+              }
 
             case Failure(NonFatal(ex)) =>
               holder.supervisionDirectiveFor(decider, ex) match {
@@ -1336,6 +1357,9 @@ private[stream] object Collect {
                   // try next element
                   pushNextIfPossible()
               }
+            case Failure(ex) =>
+              // fatal exception in buffer, not sure that it can actually happen, but for good measure
+              throw ex
           }
         }
 
@@ -1386,7 +1410,7 @@ private[stream] object Collect {
               push(out, elem)
               if (isCompleted) completeStage()
             } else buffer.enqueue(elem)
-          case Success(null) =>
+          case Success(_) =>
             if (isCompleted) completeStage()
             else if (!hasBeenPulled(in)) tryPull(in)
           case Failure(ex) =>
@@ -1714,10 +1738,12 @@ private[stream] object Collect {
  */
 @InternalApi private[akka] final class GroupedWeightedWithin[T](
     val maxWeight: Long,
-    costFn: T => Long,
+    val maxNumber: Int,
+    val costFn: T => Long,
     val interval: FiniteDuration)
     extends GraphStage[FlowShape[T, immutable.Seq[T]]] {
   require(maxWeight > 0, "maxWeight must be greater than 0")
+  require(maxNumber > 0, "maxNumber must be greater than 0")
   require(interval > Duration.Zero)
 
   val in = Inlet[T]("in")
@@ -1747,7 +1773,9 @@ private[stream] object Collect {
       private var groupEmitted = true
       private var finished = false
       private var totalWeight = 0L
+      private var totalNumber = 0
       private var hasElements = false
+      private val contextPropagation = ContextPropagation()
 
       override def preStart() = {
         scheduleWithFixedDelay(GroupedWeightedWithin.groupedWeightedWithinTimer, interval, interval)
@@ -1761,15 +1789,17 @@ private[stream] object Collect {
           failStage(new IllegalArgumentException(s"Negative weight [$cost] for element [$elem] is not allowed"))
         else {
           hasElements = true
-          if (totalWeight + cost <= maxWeight) {
+          // if there is place (both weight and number) for `elem` in the current group
+          if (totalWeight + cost <= maxWeight && totalNumber + 1 <= maxNumber) {
             buf += elem
             totalWeight += cost
+            totalNumber += 1;
 
-            if (totalWeight < maxWeight) pull(in)
+            // if potentially there is a place (both weight and number) for one more element in the current group
+            if (totalWeight < maxWeight && totalNumber < maxNumber) pull(in)
             else {
-              // `totalWeight >= maxWeight` which means that downstream can get the next group.
               if (!isAvailable(out)) {
-                // We should emit group when downstream becomes available
+                // we should emit group when downstream becomes available
                 pushEagerly = true
                 // we want to pull anyway, since we allow for zero weight elements
                 // but since `emitGroup()` will pull internally (by calling `startNewGroup()`)
@@ -1781,10 +1811,11 @@ private[stream] object Collect {
               }
             }
           } else {
-            //we have a single heavy element that weighs more than the limit
-            if (totalWeight == 0L) {
+            // if there is a single heavy element that weighs more than the limit
+            if (totalWeight == 0L && totalNumber == 0) {
               buf += elem
               totalWeight += cost
+              totalNumber += 1;
               pushEagerly = true
             } else {
               pending = elem
@@ -1803,6 +1834,7 @@ private[stream] object Collect {
 
       private def emitGroup(): Unit = {
         groupEmitted = true
+        contextPropagation.resumeContext()
         push(out, buf.result())
         buf.clear()
         if (!finished) startNewGroup()
@@ -1813,12 +1845,14 @@ private[stream] object Collect {
       private def startNewGroup(): Unit = {
         if (pending != null) {
           totalWeight = pendingWeight
+          totalNumber = 1
           pendingWeight = 0L
           buf += pending
           pending = null.asInstanceOf[T]
           groupEmitted = false
         } else {
           totalWeight = 0L
+          totalNumber = 0
           hasElements = false
         }
         pushEagerly = false
@@ -1827,6 +1861,7 @@ private[stream] object Collect {
       }
 
       override def onPush(): Unit = {
+        contextPropagation.suspendContext()
         if (pending == null) nextElement(grab(in)) // otherwise keep the element for next round
       }
 
@@ -2177,15 +2212,20 @@ private[akka] final class StatefulMapConcat[In, Out](val f: () => In => Iterable
     lazy val decider = inheritedAttributes.mandatoryAttribute[SupervisionStrategy].decider
     var currentIterator: Iterator[Out] = _
     var plainFun = f()
+    val contextPropagation = ContextPropagation()
 
     def hasNext = if (currentIterator != null) currentIterator.hasNext else false
 
     setHandlers(in, out, this)
 
-    def pushPull(): Unit =
+    def pushPull(shouldResumeContext: Boolean): Unit =
       if (hasNext) {
+        if (shouldResumeContext) contextPropagation.resumeContext()
         push(out, currentIterator.next())
-        if (!hasNext && isClosed(in)) completeStage()
+        if (hasNext) {
+          // suspend context for the next element
+          contextPropagation.suspendContext()
+        } else if (isClosed(in)) completeStage()
       } else if (!isClosed(in))
         pull(in)
       else completeStage()
@@ -2195,13 +2235,13 @@ private[akka] final class StatefulMapConcat[In, Out](val f: () => In => Iterable
     override def onPush(): Unit =
       try {
         currentIterator = plainFun(grab(in)).iterator
-        pushPull()
+        pushPull(shouldResumeContext = false)
       } catch handleException
 
     override def onUpstreamFinish(): Unit = onFinish()
 
     override def onPull(): Unit =
-      try pushPull()
+      try pushPull(shouldResumeContext = true)
       catch handleException
 
     private def handleException: Catcher[Unit] = {

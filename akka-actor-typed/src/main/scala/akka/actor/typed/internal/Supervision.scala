@@ -67,8 +67,8 @@ private abstract class AbstractSupervisor[I, Thr <: Throwable](strategy: Supervi
 
   override def isSame(other: BehaviorInterceptor[Any, Any]): Boolean = {
     other match {
-      case as: AbstractSupervisor[_, Thr] if throwableClass == as.throwableClass => true
-      case _                                                                     => false
+      case as: AbstractSupervisor[_, _] if throwableClass == as.throwableClass => true
+      case _                                                                   => false
     }
   }
 
@@ -95,7 +95,6 @@ private abstract class AbstractSupervisor[I, Thr <: Throwable](strategy: Supervi
         case Level.INFO  => logger.info(logMessage, unwrapped)
         case Level.DEBUG => logger.debug(logMessage, unwrapped)
         case Level.TRACE => logger.trace(logMessage, unwrapped)
-        case other       => throw new IllegalArgumentException(s"Unknown log level [$other].")
       }
     }
   }
@@ -193,14 +192,12 @@ private class RestartSupervisor[T, Thr <: Throwable: ClassTag](initial: Behavior
   private var deadline: OptionVal[Deadline] = OptionVal.None
 
   private def deadlineHasTimeLeft: Boolean = deadline match {
-    case OptionVal.None    => true
     case OptionVal.Some(d) => d.hasTimeLeft()
+    case _                 => true
   }
 
   override def aroundSignal(ctx: TypedActorContext[Any], signal: Signal, target: SignalTarget[T]): Behavior[T] = {
     restartingInProgress match {
-      case OptionVal.None =>
-        super.aroundSignal(ctx, signal, target)
       case OptionVal.Some((stashBuffer, children)) =>
         signal match {
           case Terminated(ref) if strategy.stopChildren && children(ref) =>
@@ -219,6 +216,8 @@ private class RestartSupervisor[T, Thr <: Throwable: ClassTag](initial: Behavior
               stashBuffer.stash(signal)
             Behaviors.same
         }
+      case _ =>
+        super.aroundSignal(ctx, signal, target)
     }
   }
 
@@ -235,7 +234,7 @@ private class RestartSupervisor[T, Thr <: Throwable: ClassTag](initial: Behavior
               } else
                 restartCompleted(ctx)
 
-            case OptionVal.None =>
+            case _ =>
               throw new IllegalStateException("Unexpected ScheduledRestart when restart not in progress")
           }
         } else {
@@ -254,18 +253,19 @@ private class RestartSupervisor[T, Thr <: Throwable: ClassTag](initial: Behavior
           target(ctx, msg.asInstanceOf[T])
         }
 
-      case m: T @unchecked =>
+      case msg =>
+        val m = msg.asInstanceOf[T]
         restartingInProgress match {
-          case OptionVal.None =>
-            try {
-              target(ctx, m)
-            } catch handleReceiveException(ctx, target)
           case OptionVal.Some((stashBuffer, _)) =>
             if (stashBuffer.isFull)
               dropped(ctx, m)
             else
               stashBuffer.stash(m)
             Behaviors.same
+          case _ =>
+            try {
+              target(ctx, m)
+            } catch handleReceiveException(ctx, target)
         }
     }
   }
@@ -371,10 +371,10 @@ private class RestartSupervisor[T, Thr <: Throwable: ClassTag](initial: Behavior
     try {
       val newBehavior = Behavior.validateAsInitial(Behavior.start(initial, ctx.asInstanceOf[TypedActorContext[T]]))
       val nextBehavior = restartingInProgress match {
-        case OptionVal.None => newBehavior
         case OptionVal.Some((stashBuffer, _)) =>
           restartingInProgress = OptionVal.None
           stashBuffer.unstashAll(newBehavior.unsafeCast)
+        case _ => newBehavior
       }
       nextBehavior.narrow
     } catch handleException(ctx, signalRestart = {
@@ -385,6 +385,8 @@ private class RestartSupervisor[T, Thr <: Throwable: ClassTag](initial: Behavior
 
   private def stopChildren(ctx: TypedActorContext[_], children: Set[ActorRef[Nothing]]): Unit = {
     children.foreach { child =>
+      // Unwatch in case the actor being restarted used watchWith to watch the child.
+      ctx.asScala.unwatch(child)
       ctx.asScala.watch(child)
       ctx.asScala.stop(child)
     }

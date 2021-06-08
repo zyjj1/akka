@@ -322,6 +322,7 @@ private[akka] trait Cell {
    * schedule the actor to run, depending on which type of cell it is.
    * Is only allowed to throw Fatal Throwables.
    */
+  @InternalStableApi
   final def sendMessage(message: Any, sender: ActorRef): Unit =
     sendMessage(Envelope(message, sender, system))
 
@@ -565,6 +566,8 @@ private[akka] class ActorCell(
       case PoisonPill                 => self.stop()
       case sel: ActorSelectionMessage => receiveSelection(sel)
       case Identify(messageId)        => sender() ! ActorIdentity(messageId, Some(self))
+      case unexpected =>
+        throw new RuntimeException(s"Unexpected message for autoreceive: $unexpected") // for exhaustiveness check, will not happen
     }
   }
 

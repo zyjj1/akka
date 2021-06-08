@@ -25,7 +25,7 @@ import java.util.function.Predicate
  * INTERNAL API
  */
 @InternalApi private[akka] object StashBufferImpl {
-  private final class Node[T](var next: Node[T], val message: T) {
+  private[akka] final class Node[T](var next: Node[T], val message: T) {
     def apply(f: T => Unit): Unit = f(message)
   }
 
@@ -219,8 +219,8 @@ import java.util.function.Predicate
         throw new IllegalArgumentException("Cannot unstash with unhandled as starting behavior")
       else if (started == BehaviorImpl.same) {
         currentBehaviorWhenUnstashInProgress match {
-          case OptionVal.None    => ctx.asScala.currentBehavior
           case OptionVal.Some(c) => c
+          case _                 => ctx.asScala.currentBehavior
         }
       } else started
 
