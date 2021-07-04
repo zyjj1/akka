@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - master
+      # for testing the GH Action without merging to master,
+      # in some cases
+      - test-publish-snapshots
     tags: ["*"]
 
 jobs:
@@ -22,6 +25,7 @@ jobs:
           java-version: adopt@1.11.0-9
       - name: Publish
         run: |-
+          sudo apt-get install graphviz
           sbt +mimaReportBinaryIssues
           sbt whitesourceCheckPolicies
           sbt ci-release
@@ -30,6 +34,7 @@ jobs:
           PGP_SECRET: ${{ secrets.PGP_SECRET }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          WHITESOURCE_PASSWORD: ${{ secrets.WHITESOURCE_PASSWORD }}
 
   # TODO publish gradle from here as well
 
